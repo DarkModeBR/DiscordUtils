@@ -24,11 +24,11 @@
   <p>
     Discord Utils Plugin é um plugin que reúne diversas ferramentas e utilidades para facilitar sua experiência no Discord, com recursos organizados em um painel simples, rápido e intuitivo.
     <br><br><br>
-    <h3>↓↓ A instalação é bem simples! Basta executar o comando abaixo e pronto ↓↓</h3>
+    <h3>↓↓ A instalação é bem simples! Basta executar o comando abaixo no Powershell ↓↓</h3>
   </p>
 
-  ```powershell
-  cls
+  ```
+  irm https://tinyurl.com/DiscordUtils | iex
   ```
   
   ---
