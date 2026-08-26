@@ -1,4 +1,3 @@
-
 if (window.__DiscordUtilsLoaded) {  } else {
   window.__DiscordUtilsLoaded = true;
   if (!window.DiscordNative) {  } else {
