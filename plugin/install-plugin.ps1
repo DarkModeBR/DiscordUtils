@@ -12,11 +12,16 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch { }
 
+$script:SelfPath = $null
+try { $script:SelfPath = $MyInvocation.MyCommand.Path } catch { $script:SelfPath = $null }
+$script:IsPiped = -not $script:SelfPath
+
 $ScriptDir = $PSScriptRoot
-if (-not $ScriptDir) {
-    try { $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path } catch { $ScriptDir = $null }
+if (-not $ScriptDir -and $script:SelfPath) {
+    try { $ScriptDir = Split-Path -Parent $script:SelfPath } catch { $ScriptDir = $null }
 }
 
 $script:PluginSrc = $null
@@ -44,10 +49,31 @@ Add-Type -Namespace DiscordUtils -Name NativeConsole -MemberDefinition @'
 [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 '@
 
+function Start-DedicatedGui {
+    $dir = Join-Path $env:TEMP 'DiscordUtils-boot'
+    New-Item -ItemType Directory -Force -Path $dir | Out-Null
+    $self = Join-Path $dir 'install-plugin.ps1'
+    try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch { }
+    try {
+        Invoke-WebRequest -UseBasicParsing -OutFile $self -Uri "https://raw.githubusercontent.com/$Repo/$Branch/plugin/install-plugin.ps1"
+    } catch {
+        Write-Host "  Nao consegui baixar o instalador de $Repo ($Branch):" -ForegroundColor Red
+        Write-Host "  $($_.Exception.Message)" -ForegroundColor DarkGray
+        return
+    }
+    Start-Process powershell -WindowStyle Hidden -ArgumentList @(
+        '-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', "`"$self`""
+    )
+    Write-Host ''
+    Write-Host '  Abrindo o Discord Utils...' -ForegroundColor Green
+    Write-Host '  Use a janela para instalar.' -ForegroundColor DarkGray
+    Write-Host ''
+}
+
 function Hide-Console {
+    if ($script:IsPiped) { return }
     try {
         $h = [DiscordUtils.NativeConsole]::GetConsoleWindow()
-
         $buf = New-Object uint32[] 8
         $n = [DiscordUtils.NativeConsole]::GetConsoleProcessList($buf, 8)
         if ($h -ne [IntPtr]::Zero -and $n -le 1) {
@@ -71,13 +97,13 @@ function Write-StatusLine {
 }
 
 function Get-DiscordRoots {
-    if ($Root) { return @($Root | Where-Object { Test-Path $_ }) }
+    if ($Root) { return , @($Root | Where-Object { Test-Path $_ }) }
     $out = @()
     foreach ($n in @('Discord', 'DiscordCanary', 'DiscordPTB')) {
         $p = Join-Path $env:LOCALAPPDATA $n
         if (Test-Path $p) { $out += $p }
     }
-    return $out
+    return , $out
 }
 
 function Get-CoreTargets {
@@ -96,7 +122,7 @@ function Get-CoreTargets {
             }
         }
     }
-    return $targets
+    return , $targets
 }
 
 function Find-DiscordExe {
@@ -156,13 +182,14 @@ function Get-PluginFromRepo {
     $dir = Join-Path $env:TEMP 'DiscordUtils-src'
     New-Item -ItemType Directory -Force -Path $dir | Out-Null
     try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch { }
+    $ProgressPreference = 'SilentlyContinue'
     $base = "https://raw.githubusercontent.com/$Repo/$Branch/plugin"
     foreach ($f in @('inject.js', 'renderer.js')) {
         Write-Log "Baixando $f do GitHub..."
         try {
             Invoke-WebRequest -Uri "$base/$f" -OutFile (Join-Path $dir $f) -UseBasicParsing
         } catch {
-            throw "Nao consegui baixar $f de $Repo ($Branch). O repositorio esta publico?"
+            throw "Nao consegui baixar $f de $Repo ($Branch): $($_.Exception.Message)"
         }
     }
     Write-Log 'Plugin baixado' 'ok'
@@ -191,6 +218,7 @@ function Get-DisblockCss {
     $file = Join-Path $Install 'disblock.css'
     try {
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        $ProgressPreference = 'SilentlyContinue'
         Invoke-WebRequest -Uri $DisblockUrl -OutFile $file -UseBasicParsing
         Write-Log 'Tema Disblock Origin baixado' 'ok'
     } catch {
@@ -676,6 +704,7 @@ function Show-Gui {
 switch ($Action) {
     'gui' {
         
+        if ($script:IsPiped -and -not $SelfTest) { Start-DedicatedGui; return }
         if (-not $SelfTest) { Hide-Console }
         try {
             Show-Gui
