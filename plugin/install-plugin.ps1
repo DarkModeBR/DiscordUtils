@@ -1,4 +1,3 @@
-
 [CmdletBinding()]
 param(
     [ValidateSet('gui', 'install', 'repair', 'uninstall', 'none')]
@@ -8,15 +7,28 @@ param(
     [switch]$NoRestart,
     [switch]$NoDiscordConfig,
     [switch]$SelfTest,
-    [string]$Repo,
+    [string]$Repo = 'DarkModeBR/DiscordUtils',
     [string]$Branch = 'main'
 )
 
 $ErrorActionPreference = 'Stop'
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch { }
 
-$ScriptDir   = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
-$PluginSrc   = Join-Path $ScriptDir 'plugin'
+$ScriptDir = $PSScriptRoot
+if (-not $ScriptDir) {
+    try { $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path } catch { $ScriptDir = $null }
+}
+
+$script:PluginSrc = $null
+if ($ScriptDir) {
+    if (Test-Path (Join-Path $ScriptDir 'renderer.js')) {
+        $script:PluginSrc = $ScriptDir
+    } elseif (Test-Path (Join-Path $ScriptDir 'plugin' | Join-Path -ChildPath 'renderer.js')) {
+        $script:PluginSrc = Join-Path $ScriptDir 'plugin'
+    }
+}
+$script:FromRepo = -not $script:PluginSrc
+
 $Install     = if ($InstallDir) { $InstallDir } else { Join-Path $env:APPDATA 'DiscordUtils' }
 $InjectFile  = Join-Path $Install 'inject.js'
 $MarkerStart = '/* === DiscordUtils inject start === */'
@@ -140,13 +152,38 @@ function Start-Discord {
     Write-Log 'Abra o Discord manualmente.' 'warn'
 }
 
+function Get-PluginFromRepo {
+    $dir = Join-Path $env:TEMP 'DiscordUtils-src'
+    New-Item -ItemType Directory -Force -Path $dir | Out-Null
+    try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch { }
+    $base = "https://raw.githubusercontent.com/$Repo/$Branch/plugin"
+    foreach ($f in @('inject.js', 'renderer.js')) {
+        Write-Log "Baixando $f do GitHub..."
+        try {
+            Invoke-WebRequest -Uri "$base/$f" -OutFile (Join-Path $dir $f) -UseBasicParsing
+        } catch {
+            throw "Nao consegui baixar $f de $Repo ($Branch). O repositorio esta publico?"
+        }
+    }
+    Write-Log 'Plugin baixado' 'ok'
+    return $dir
+}
+
+function Resolve-PluginSrc {
+    if ($script:PluginSrc) { return $script:PluginSrc }
+    $script:PluginSrc = Get-PluginFromRepo
+    $script:FromRepo = $true
+    return $script:PluginSrc
+}
+
 function Copy-PluginFiles {
-    if (-not (Test-Path (Join-Path $PluginSrc 'inject.js')) -or -not (Test-Path (Join-Path $PluginSrc 'renderer.js'))) {
-        throw "Nao achei plugin\inject.js e plugin\renderer.js em: $PluginSrc"
+    $src = Resolve-PluginSrc
+    if (-not (Test-Path (Join-Path $src 'inject.js')) -or -not (Test-Path (Join-Path $src 'renderer.js'))) {
+        throw "Nao achei inject.js e renderer.js em: $src"
     }
     New-Item -ItemType Directory -Force -Path $Install | Out-Null
-    Copy-Item -LiteralPath (Join-Path $PluginSrc 'inject.js')   -Destination $InjectFile -Force
-    Copy-Item -LiteralPath (Join-Path $PluginSrc 'renderer.js') -Destination (Join-Path $Install 'renderer.js') -Force
+    Copy-Item -LiteralPath (Join-Path $src 'inject.js')   -Destination $InjectFile -Force
+    Copy-Item -LiteralPath (Join-Path $src 'renderer.js') -Destination (Join-Path $Install 'renderer.js') -Force
     Write-Log 'Arquivos do plugin copiados' 'ok'
 }
 
@@ -170,12 +207,14 @@ function Sync-PluginSettings {
     if (-not ($cfg.PSObject.Properties.Name -contains 'devtools')) {
         $cfg | Add-Member -NotePropertyName 'devtools' -NotePropertyValue $true -Force
     }
-    if ($Repo) {
+    if ($script:FromRepo) {
         $cfg | Add-Member -NotePropertyName 'repo' -NotePropertyValue $Repo -Force
         $cfg | Add-Member -NotePropertyName 'branch' -NotePropertyValue $Branch -Force
         $cfg.PSObject.Properties.Remove('sourceDir')
     } else {
-        $cfg | Add-Member -NotePropertyName 'sourceDir' -NotePropertyValue $ScriptDir -Force
+        $cfg | Add-Member -NotePropertyName 'sourceDir' -NotePropertyValue $script:PluginSrc -Force
+        $cfg.PSObject.Properties.Remove('repo')
+        $cfg.PSObject.Properties.Remove('branch')
     }
     if (-not ($cfg.PSObject.Properties.Name -contains 'autoUpdate')) {
         $cfg | Add-Member -NotePropertyName 'autoUpdate' -NotePropertyValue $true -Force
