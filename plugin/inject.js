@@ -1,4 +1,3 @@
-
 'use strict';
 
 const path = require('path');
@@ -82,11 +81,19 @@ const MARK_END = '/* === DiscordUtils inject end === */';
 const DISCORD_ROOTS = ['Discord', 'DiscordCanary', 'DiscordPTB']
   .map((n) => path.join(process.env.LOCALAPPDATA || '', n));
 
+function sourceFile(dir, name) {
+  for (const p of [path.join(dir, name), path.join(dir, 'plugin', name)]) {
+    try { if (fs.statSync(p).isFile()) return p; } catch (_) {}
+  }
+  return null;
+}
+
 function syncFromSource() {
   const dir = SETTINGS.sourceDir;
   if (!dir) return;
   for (const name of ['renderer.js', 'inject.js']) {
-    const from = path.join(dir, 'plugin', name);
+    const from = sourceFile(dir, name);
+    if (!from) continue;
     const to = path.join(__dirname, name);
     try {
       const a = fs.statSync(from);
@@ -190,9 +197,11 @@ function ensureRendererPresent() {
   if (fs.existsSync(target)) return;
   const dir = SETTINGS.sourceDir;
   if (!dir) return;
+  const from = sourceFile(dir, 'renderer.js');
+  if (!from) return;
   try {
     fs.mkdirSync(__dirname, { recursive: true });
-    fs.writeFileSync(target, fs.readFileSync(path.join(dir, 'plugin', 'renderer.js')));
+    fs.writeFileSync(target, fs.readFileSync(from));
     console.log('[DiscordUtils] renderer.js restaurado do projeto.');
   } catch (_) {}
 }
