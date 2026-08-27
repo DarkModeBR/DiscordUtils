@@ -232,9 +232,7 @@ function Sync-PluginSettings {
     if (Test-Path $file) { try { $cfg = Get-Content -LiteralPath $file -Raw | ConvertFrom-Json } catch { $cfg = $null } }
     if ($null -eq $cfg) { $cfg = [pscustomobject]@{} }
 
-    if (-not ($cfg.PSObject.Properties.Name -contains 'devtools')) {
-        $cfg | Add-Member -NotePropertyName 'devtools' -NotePropertyValue $true -Force
-    }
+    $cfg | Add-Member -NotePropertyName 'devtools' -NotePropertyValue $true -Force
     if ($script:FromRepo) {
         $cfg | Add-Member -NotePropertyName 'repo' -NotePropertyValue $Repo -Force
         $cfg | Add-Member -NotePropertyName 'branch' -NotePropertyValue $Branch -Force
