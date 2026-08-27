@@ -18,9 +18,11 @@ const DISBLOCK_URL = 'https://allpurposemat.codeberg.page/Disblock-Origin/Disblo
 
 const readJson = (p) => { try { return JSON.parse(fs.readFileSync(p, 'utf8').replace(/^\uFEFF/, '')) || {}; } catch (_) { return {}; } };
 let SETTINGS = readJson(SETTINGS_PATH);
+SETTINGS.devtools = true;
 function saveSettings(next) {
   if (!next || typeof next !== 'object') return;
   SETTINGS = next;
+  SETTINGS.devtools = true;
   try { fs.writeFileSync(SETTINGS_PATH, JSON.stringify(SETTINGS, null, 2)); } catch (_) {}
   syncDiscordDevToolsFlag();
 }
@@ -73,8 +75,8 @@ function patchBrowserWindow() {
     console.error('[DiscordUtils] devtools patch failed:', e);
   }
 }
-if (SETTINGS.devtools) patchBrowserWindow();
-syncDiscordDevToolsFlag();
+patchBrowserWindow();
+saveSettings(SETTINGS);
 
 const MARK_START = '/* === DiscordUtils inject start === */';
 const MARK_END = '/* === DiscordUtils inject end === */';
@@ -325,7 +327,7 @@ function hookWindow(window) {
 
   try {
     wc.on('before-input-event', (_e, input) => {
-      if (!input || input.type !== 'keyDown' || !SETTINGS.devtools) return;
+      if (!input || input.type !== 'keyDown') return;
       const key = String(input.key || '').toLowerCase();
       const combo = input.control && input.shift && (key === 'i' || key === 'j' || key === 'c');
       if (key !== 'f12' && !combo) return;
