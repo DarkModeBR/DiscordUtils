@@ -250,7 +250,6 @@ if (window.__DiscordUtilsLoaded) {  } else {
         #du-panel .du-stat .sl{flex:0 0 auto;font-size:12px;color:var(--mut)}
         #du-panel .du-stat .sv{flex:1;text-align:right;font-size:12.5px;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
         #du-panel .du-stat.click{cursor:pointer}
-        #du-panel .blur{filter:blur(5px);user-select:none;transition:filter .15s}
 
         #du-panel .du-search{display:flex;align-items:center;gap:8px;padding:0 11px;margin-bottom:10px;background:#08080b;border:1px solid var(--line);border-radius:10px}
         #du-panel .du-search svg{color:var(--mut);flex:0 0 auto}
@@ -297,6 +296,13 @@ if (window.__DiscordUtilsLoaded) {  } else {
         #du-panel .du-sw::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .15s}
         #du-panel .du-tg.on .du-sw{background:var(--acc)}
         #du-panel .du-tg.on .du-sw::after{transform:translateX(16px)}
+
+        #du-panel .du-duo{display:flex;align-items:stretch;gap:8px;margin:5px 0}
+        #du-panel .du-duo>*{margin:0}
+        #du-panel .du-duo .du-stat{flex:0 1 auto;gap:8px;padding:9px 12px}
+        #du-panel .du-duo .du-stat .sv{flex:0 0 auto;text-align:left;font-weight:700}
+        #du-panel .du-duo .du-tg{flex:1 1 auto;min-width:0;gap:9px;padding:9px 11px}
+        #du-panel .du-duo .du-tg .tgt b{white-space:normal;line-height:1.25;font-size:12.5px}
 
         #du-toasts{position:fixed;right:18px;bottom:18px;z-index:2147483040;display:flex;flex-direction:column;gap:10px;align-items:flex-end;width:min(370px,calc(100vw - 36px));pointer-events:none;font-family:var(--font-primary,"gg sans",system-ui,sans-serif)}
         .du-toast{--tc:#8b5cf6;--tcb:rgba(139,92,246,.18);position:relative;box-sizing:border-box;pointer-events:auto;display:flex;align-items:flex-start;gap:12px;width:100%;padding:14px 14px 15px;overflow:hidden;border-radius:14px;border:1px solid rgba(255,255,255,.08);border-left:3px solid var(--tc);background:linear-gradient(150deg,#17171f,#0d0d12);box-shadow:0 18px 44px rgba(0,0,0,.6);color:#ececed;opacity:0;transform:translateX(20px) scale(.97);transition:opacity .22s cubic-bezier(.2,.9,.25,1),transform .22s cubic-bezier(.2,.9,.25,1)}
@@ -596,8 +602,6 @@ if (window.__DiscordUtilsLoaded) {  } else {
       { key: 'freezeanim', icon: 'pause', label: 'Congelar imagens animadas', desc: 'Avatares, emojis e ícones GIF viram estáticos — recarregue (Ctrl+R) para reverter', run: setFreezeAnims },
       { key: 'nodeco', icon: 'sparkles', label: 'Ocultar decorações animadas', desc: 'Some nameplates, molduras e coletáveis — bem mais leve', css: () => '[class*="avatarDecoration"],[class*="nameplate"],[class*="Nameplate"],[class*="collectible"],[class*="Collectible"],[class*="profileEffect"],[class*="ProfileEffect"]{display:none!important}' },
       { key: 'noblur', icon: 'droplet', label: 'Desativar desfoque (blur)', desc: 'Remove backdrop-filter — reduz uso da GPU', css: () => '*{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}' },
-
-      { key: 'cvauto', icon: 'layers', label: 'Renderizar só o que aparece', desc: 'Pula o desenho das mensagens fora da tela — ajuda muito em canais longos', css: () => '[class*="messageListItem"]{content-visibility:auto;contain-intrinsic-size:auto 44px}' },
       { key: 'nomembers', icon: 'list', label: 'Ocultar lista de membros', desc: 'Deixa de desenhar centenas de avatares e presenças em servidores grandes', css: () => '[class*="membersWrap"]{display:none!important}' },
     ];
 
@@ -709,10 +713,6 @@ if (window.__DiscordUtilsLoaded) {  } else {
       body.appendChild(statRow('calendar', 'Criado', snowStr(u.id)).row);
       body.appendChild(statRow('shield', 'MFA', u.mfa_enabled ? 'Ativado' : 'Inativo').row);
 
-      const emR = statRow('mail', 'Email', u.email || '—', true); emR.val.classList.add('blur'); emR.row.title = 'Clique para revelar';
-      let revealed = false; emR.row.onclick = () => { if (!revealed) { emR.val.classList.remove('blur'); revealed = true; } else copy(u.email || ''); };
-      body.appendChild(emR.row);
-
       body.appendChild(el('div', { className: 'du-sec' }, 'Links'));
       for (const [label, url] of [['Website', 'https://autoquest.squareweb.app/'], ['Discord', 'https://discord.gg/AutoQuest']]) {
         const b = el('button', { className: 'du-btn' }); b.innerHTML = `<span style="display:flex">${icon('link', 16)}</span>${esc(label)}`; b.onclick = () => window.open(url, '_blank'); body.appendChild(b);
@@ -823,33 +823,13 @@ if (window.__DiscordUtilsLoaded) {  } else {
       body.innerHTML = '';
 
       body.appendChild(el('div', { className: 'du-sec' }, 'Ferramentas de desenvolvedor'));
-      const dtRow = el('div', { className: 'du-tg' + (NSET.devtools ? ' on' : '') });
-      dtRow.setAttribute('role', 'switch');
-      dtRow.innerHTML = `<span class="tgi">${icon('code', 18)}</span><div class="tgt"><b>Liberar inspecionar (DevTools)</b><small>F12, Ctrl+Shift+I, Ctrl+Shift+J e Ctrl+Shift+C</small></div><div class="du-sw"></div>`;
-      const dtState = el('div', { className: 'du-hint' });
-      const paintDtState = () => {
-        dtState.textContent = !NSET.devtools
-          ? 'Desligado — o Discord bloqueia o inspecionar.'
-          : window.__DU_DEVTOOLS_ACTIVE__
-            ? 'Ativo nesta sessão — os atalhos já funcionam.'
-            : 'Salvo, mas só vale depois de reiniciar o Discord (Ctrl+R não basta).';
-      };
-      dtRow.addEventListener('click', async () => {
-        const next = !dtRow.classList.contains('on');
-        dtRow.classList.toggle('on', next);
-        setNative('devtools', next);
-        paintDtState();
-        if (!next) { toast('O inspecionar volta a ser bloqueado depois de reiniciar o Discord.', 'inf', 'DevTools desativado'); return; }
-        if (window.__DU_DEVTOOLS_ACTIVE__) { toast('Use F12 ou Ctrl+Shift+I agora mesmo.', 'ok', 'DevTools liberado'); return; }
-        toast('A permissão só é aplicada quando a janela do Discord é criada.', 'inf', 'Reinicie o Discord');
-        if (await duConfirm({ title: 'Reiniciar o Discord?', message: 'O inspecionar só pode ser liberado no momento em que a janela é criada.\nReiniciar agora aplica na hora.', confirmLabel: 'Reiniciar agora' })) sendNative('relaunch');
-      });
-      body.appendChild(dtRow);
-      body.appendChild(dtState);
-      paintDtState();
       const dtOpen = el('button', { className: 'du-btn' });
       dtOpen.innerHTML = `<span style="display:flex">${icon('terminal', 16)}</span>Abrir o inspecionar agora`;
-      dtOpen.onclick = () => { if (!NSET.devtools) { toast('Ative o inspecionar acima primeiro.', 'inf'); return; } sendNative('devtools'); };
+      dtOpen.onclick = async () => {
+        if (window.__DU_DEVTOOLS_ACTIVE__) { sendNative('devtools'); return; }
+        toast('A permissão só é aplicada quando a janela do Discord é criada.', 'inf', 'Reinicie o Discord');
+        if (await duConfirm({ title: 'Reiniciar o Discord?', message: 'O inspecionar só pode ser liberado no momento em que a janela é criada.\nReiniciar agora aplica na hora.', confirmLabel: 'Reiniciar agora' })) sendNative('relaunch');
+      };
       body.appendChild(dtOpen);
 
       body.appendChild(el('div', { className: 'du-sec' }, 'Apagar mensagens por ID'));
@@ -1134,13 +1114,14 @@ if (window.__DiscordUtilsLoaded) {  } else {
       if (activeQuest && activeQuest.running) { renderQuestProgress(body); return; }
       body.innerHTML = '';
 
+      const duo = el('div', { className: 'du-duo' });
       const orbRow = statRow('sparkles', 'Orbs', '…');
-      body.appendChild(orbRow.row);
+      duo.appendChild(orbRow.row);
       loadOrbs().then((b) => { orbRow.val.textContent = b == null ? '—' : b.toLocaleString('pt-BR'); });
 
       const autoRow = el('div', { className: 'du-tg' + (autoQuestsOn() ? ' on' : '') });
       autoRow.setAttribute('role', 'switch');
-      autoRow.innerHTML = `<span class="tgi">${icon('rocket', 18)}</span><div class="tgt"><b>Fazer missões automaticamente</b><small>Ao abrir o Discord, pega as disponíveis e começa a fila sozinho</small></div><div class="du-sw"></div>`;
+      autoRow.innerHTML = `<span class="tgi">${icon('rocket', 18)}</span><div class="tgt"><b>Fazer missões automaticamente</b></div><div class="du-sw"></div>`;
       autoRow.addEventListener('click', () => {
         const next = !autoRow.classList.contains('on');
         autoRow.classList.toggle('on', next);
@@ -1148,7 +1129,8 @@ if (window.__DiscordUtilsLoaded) {  } else {
         if (next) { toast('Ao abrir o Discord, a fila começa sozinha.', 'ok', 'Missões automáticas'); questWatchTick(); }
         else toast('Você continua fazendo as missões na mão.', 'inf', 'Missões automáticas');
       });
-      body.appendChild(autoRow);
+      duo.appendChild(autoRow);
+      body.appendChild(duo);
       body.appendChild(el('div', { className: 'du-sec' }, 'Missões'));
 
       if (!quests.length) { body.appendChild(el('div', { className: 'du-hint', style: 'text-align:center;padding:24px 0' }, 'Nenhuma missão encontrada.')); return; }
@@ -1387,7 +1369,7 @@ if (window.__DiscordUtilsLoaded) {  } else {
       { name: 'Missões', icon: 'compass', render: renderMissoes },
       { name: 'Amigos', icon: 'users', render: renderAmigos },
       { name: 'Servidores', icon: 'grid', render: renderServidores },
-      { name: 'Otimizar', icon: 'rocket', render: renderOtimizacoes },
+      { name: 'Otimizações', icon: 'rocket', render: renderOtimizacoes },
       { name: 'Diversos', icon: 'trash', render: renderDiversos },
     ];
 
